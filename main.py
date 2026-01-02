@@ -638,14 +638,15 @@ def main():
     parser.add_argument('--quarantine', action='store_true', help='Move to quarantine instead of delete')
     parser.add_argument('--delete', action='store_true', help='Permanently delete duplicates')
     parser.add_argument('--no-hash', action='store_true', help='Skip hash computation (faster)')
-    parser.add_argument('--roms-dir', type=Path, default=ROMS_DIR, help='ROMs directory')
+    parser.add_argument('--roms-dir', type=Path, default=Path.cwd(), help='ROMs directory (default: current directory)')
     parser.add_argument('--platform', type=str, help='Only process specific platform')
 
     args = parser.parse_args()
 
+    # Default to purge dry-run when no action specified
     if not any([args.scan, args.report, args.purge]):
-        parser.print_help()
-        return
+        args.purge = True
+        args.dry_run = True
 
     # Verify paths
     if not args.roms_dir.exists():
@@ -701,6 +702,12 @@ def main():
 
         purger = Purger(args.roms_dir, QUARANTINE_DIR)
         purger.purge(detector.duplicates, mode=mode)
+
+        # After dry-run, show next steps
+        if mode == 'dry-run':
+            print(f"\nReport saved to: {REPORT_FILE}")
+            print("\nTo permanently delete duplicates, run:")
+            print(f"  retro-romset-cleaner --purge --delete --roms-dir {args.roms_dir}")
 
 
 if __name__ == '__main__':
