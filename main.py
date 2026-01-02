@@ -23,6 +23,7 @@ import csv
 import json
 import hashlib
 import argparse
+import shutil
 import logging
 from pathlib import Path
 from collections import defaultdict
@@ -599,7 +600,7 @@ class Purger:
                 try:
                     dest = self.quarantine_dir / dup['remove']
                     dest.parent.mkdir(parents=True, exist_ok=True)
-                    rom_path.rename(dest)
+                    shutil.move(str(rom_path), str(dest))
                     logger.info(f"Quarantined: {dup['remove']}")
                     removed_count += 1
                     removed_size += dup['size']
@@ -702,7 +703,8 @@ def main():
         else:
             mode = 'dry-run'
 
-        purger = Purger(args.roms_dir, QUARANTINE_DIR)
+        quarantine_dir = args.roms_dir / "_quarantine"
+        purger = Purger(args.roms_dir, quarantine_dir)
         purger.purge(detector.duplicates, mode=mode)
 
         # After dry-run, show next steps
