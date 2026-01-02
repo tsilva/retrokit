@@ -15,6 +15,9 @@ uv tool install .
 ## Running the Tool
 
 ```bash
+# Default: scan (if needed) + dry-run showing what would be removed
+retro-romset-cleaner
+
 # Scan and analyze ROMs (read-only)
 retro-romset-cleaner --scan
 

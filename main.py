@@ -643,10 +643,14 @@ def main():
 
     args = parser.parse_args()
 
-    # Default to purge dry-run when no action specified
+    # Default to scan + purge dry-run when no action specified
     if not any([args.scan, args.report, args.purge]):
         args.purge = True
         args.dry_run = True
+        # Auto-scan if no previous report exists
+        if not REPORT_FILE.exists():
+            args.scan = True
+            args.report = True
 
     # Verify paths
     if not args.roms_dir.exists():
