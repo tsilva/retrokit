@@ -1,82 +1,68 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+ROM deduplication tool for retro game collections. Identifies and removes duplicates based on hash matches, region priority, format preferences, revision variants, and bad dump indicators.
 
-## Project Overview
-
-This is a ROM deduplication tool for retro game collections. It identifies and removes duplicate ROMs based on hash matches, region priority, format preferences, revision variants, and bad dump indicators.
-
-## Installation
+## Commands
 
 ```bash
+# Install
 uv tool install .
-```
 
-## Running the Tool
-
-```bash
-# Default: scan (if needed) + dry-run showing what would be removed
+# Default: auto-scan + dry-run showing what would be removed
 retro-romset-cleaner
 
-# Scan and analyze ROMs (read-only)
-retro-romset-cleaner --scan
+# Individual operations
+retro-romset-cleaner --scan                    # Scan ROMs (read-only)
+retro-romset-cleaner --report                  # Generate CSV report
+retro-romset-cleaner --purge --dry-run         # Preview removals
+retro-romset-cleaner --purge --quarantine      # Move to _quarantine/
+retro-romset-cleaner --purge --delete          # Permanently delete
 
-# Generate CSV report of duplicates
-retro-romset-cleaner --report
-
-# Show what would be removed (dry run)
-retro-romset-cleaner --purge --dry-run
-
-# Move duplicates to quarantine folder
-retro-romset-cleaner --purge --quarantine
-
-# Permanently delete duplicates
-retro-romset-cleaner --purge --delete
-
-# Skip hash computation for faster scanning
-retro-romset-cleaner --scan --no-hash
-
-# Process specific platform only
-retro-romset-cleaner --scan --platform "Nintendo 64"
+# Options
+--no-hash                  # Skip MD5 computation (faster)
+--platform "Nintendo 64"   # Process single platform
+--roms-dir /path/to/roms   # Specify ROMs directory
 ```
 
 ## Architecture
 
-The tool is a single-file Python script (`main.py`) with no external dependencies beyond the standard library.
+Single-file Python script (`main.py`), Python >=3.9, no external dependencies.
 
-**Key Classes:**
-- `RomInfo` - Parses ROM filenames to extract metadata (regions, revisions, tags, dump quality indicators)
-- `DuplicateDetector` - Scans directories, indexes ROMs by hash and normalized name, identifies duplicates
-- `Purger` - Handles file removal with dry-run, quarantine, and delete modes
+**Classes:**
+- `RomInfo` - Parses filenames for regions, revisions, tags, dump quality
+- `DuplicateDetector` - Scans, indexes by hash/name, finds duplicates
+- `Purger` - Handles dry-run, quarantine, and delete modes
 
-**Duplicate Detection Phases:**
-1. Exact hash matches (MD5)
-2. Name-based matches within each platform (considering format preferences)
+**Duplicate detection phases:**
+1. Exact MD5 hash matches
+2. Name-based matches within platform (format preferences apply)
 3. Always-remove bad ROMs (betas, prototypes, hacks, bad dumps)
 
-**Priority Scoring:**
-ROMs are ranked by: bad dump status → source variant → good dump tag → region priority → revision number
+**Priority scoring:** bad dump status > source variant > good dump tag > region priority > revision number
 
-## Configuration Constants
+## Configuration
 
-The following dictionaries in `main.py` control deduplication behavior:
-- `REGION_PRIORITY` - Region preference ranking (USA > Europe > Japan > World)
-- `REMOVE_TAGS` - Parenthetical tags marking ROMs for removal (Beta, Proto, Pirate, etc.)
-- `REMOVE_BRACKET_TAGS` - Square bracket tags for hacks/bad dumps ([h], [b], [p], etc.)
-- `PREFERRED_FORMATS` - Per-platform format preferences (e.g., Commodore 64 prefers .d64)
-- `SKIP_PLATFORMS` - Platforms excluded from deduplication (MS-DOS, ScummVM, etc.)
+Edit these dictionaries in `main.py` to customize:
 
-## Directory Structure Assumptions
+| Constant | Purpose | Default |
+|----------|---------|---------|
+| `REGION_PRIORITY` | Region ranking | USA > Europe > Japan > World |
+| `REMOVE_TAGS` | Parenthetical tags to remove | Beta, Proto, Pirate, Demo... |
+| `REMOVE_BRACKET_TAGS` | Bracket tags for bad dumps | [h], [b], [p], [t]... |
+| `PREFERRED_FORMATS` | Per-platform format preference | C64: .d64, Amiga: .adf... |
+| `SKIP_PLATFORMS` | Platforms to skip | MS-DOS, ScummVM, Windows |
 
-The tool expects ROMs organized as:
+## Directory Structure
+
+Expected input:
 ```
-../roms/
+<roms-dir>/
   Platform Name/
     game.rom
     game (USA).rom
 ```
 
-Output files are created in the script directory:
-- `duplicate_report.csv` - Generated report
+Generated files (in script directory):
 - `scan_cache.json` - Cached scan results
+- `duplicate_report.csv` - Removal report
 - `dedup.log` - Log file
