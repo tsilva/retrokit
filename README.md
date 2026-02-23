@@ -13,6 +13,8 @@
 
 ## Features
 
+[![CI](https://github.com/tsilva/retro-romset-cleaner/actions/workflows/release.yml/badge.svg)](https://github.com/tsilva/retro-romset-cleaner/actions/workflows/release.yml)
+
 - **Hash-based deduplication** - Finds exact duplicates via MD5 matching
 - **Region priority** - Keeps USA > Europe > Japan > World variants
 - **Revision detection** - Automatically keeps the latest revision
