@@ -16,19 +16,19 @@ Usage:
     python rom_dedup.py --purge --delete    # Permanently delete duplicates
 """
 
+import argparse
+import csv
+import hashlib
+import json
+import logging
 import os
 import re
-import sys
-import csv
-import json
-import hashlib
-import argparse
 import shutil
-import logging
-from pathlib import Path
+import sys
 from collections import defaultdict
 from datetime import datetime
-from typing import Dict, List, Tuple, Optional, Set
+from pathlib import Path
+from typing import Dict, List, Optional, Set, Tuple
 
 # Get script directory for relative paths
 SCRIPT_DIR = Path(__file__).parent.resolve()
@@ -42,11 +42,8 @@ LOG_FILE = SCRIPT_DIR / "dedup.log"
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler(LOG_FILE),
-        logging.StreamHandler()
-    ]
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[logging.FileHandler(LOG_FILE), logging.StreamHandler()],
 )
 logger = logging.getLogger(__name__)
 
@@ -56,103 +53,188 @@ logger = logging.getLogger(__name__)
 
 # Region priority (higher = better)
 REGION_PRIORITY = {
-    'USA': 100,
-    'U': 100,
-    'US': 100,
-    'America': 100,
-    'Europe': 80,
-    'E': 80,
-    'EU': 80,
-    'World': 70,
-    'W': 70,
-    'Japan': 50,
-    'J': 50,
-    'JP': 50,
-    'Korea': 40,
-    'K': 40,
-    'Asia': 40,
-    'France': 35,
-    'F': 35,
-    'Germany': 35,
-    'G': 35,
-    'Spain': 35,
-    'S': 35,
-    'Italy': 35,
-    'I': 35,
-    'Australia': 60,
-    'A': 60,
-    'Brazil': 30,
-    'B': 30,
-    'China': 30,
-    'C': 30,
+    "USA": 100,
+    "U": 100,
+    "US": 100,
+    "America": 100,
+    "Europe": 80,
+    "E": 80,
+    "EU": 80,
+    "World": 70,
+    "W": 70,
+    "Japan": 50,
+    "J": 50,
+    "JP": 50,
+    "Korea": 40,
+    "K": 40,
+    "Asia": 40,
+    "France": 35,
+    "F": 35,
+    "Germany": 35,
+    "G": 35,
+    "Spain": 35,
+    "S": 35,
+    "Italy": 35,
+    "I": 35,
+    "Australia": 60,
+    "A": 60,
+    "Brazil": 30,
+    "B": 30,
+    "China": 30,
+    "C": 30,
 }
 
 # Tags that mark ROMs for removal (always remove these)
 REMOVE_TAGS = {
     # Betas and prototypes
-    'Beta', 'Proto', 'Prototype', 'Sample', 'Demo', 'Preview', 'Promo',
-    'Pre-Release', 'Prerelease', 'Debug', 'Test',
+    "Beta",
+    "Proto",
+    "Prototype",
+    "Sample",
+    "Demo",
+    "Preview",
+    "Promo",
+    "Pre-Release",
+    "Prerelease",
+    "Debug",
+    "Test",
     # Pirate/Unlicensed
-    'Pirate', 'Unl', 'Unlicensed', 'Bootleg',
+    "Pirate",
+    "Unl",
+    "Unlicensed",
+    "Bootleg",
     # Special versions to deprioritize
-    'BIOS', 'Program',
+    "BIOS",
+    "Program",
 }
 
 # Bracket tags that mark bad dumps or hacks [tag]
 REMOVE_BRACKET_TAGS = {
-    'h', 'h1', 'h2', 'h3', 'h4', 'h5',  # Hacks
-    't', 't1', 't2', 't3',  # Trainers
-    'p', 'p1', 'p2', 'p3', 'p4', 'p5',  # Pirate
-    'b', 'b1', 'b2', 'b3',  # Bad dumps
-    'o', 'o1',  # Overdump
-    'f', 'f1',  # Fixed
-    'T+',  # Translation (deprioritize unless only version)
+    "h",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",  # Hacks
+    "t",
+    "t1",
+    "t2",
+    "t3",  # Trainers
+    "p",
+    "p1",
+    "p2",
+    "p3",
+    "p4",
+    "p5",  # Pirate
+    "b",
+    "b1",
+    "b2",
+    "b3",  # Bad dumps
+    "o",
+    "o1",  # Overdump
+    "f",
+    "f1",  # Fixed
+    "T+",  # Translation (deprioritize unless only version)
 }
 
 # Good dump indicator (prioritize these)
-GOOD_DUMP_TAG = '!'
+GOOD_DUMP_TAG = "!"
 
 # Source variants to deprioritize when original exists
 SOURCE_VARIANTS = {
-    'Virtual Console', 'Switch Online', 'Evercade', 'Wii', '3DS',
-    'NSO', 'Classic Mini', 'Mini', 'Genesis Mini', 'Mega Drive Mini',
+    "Virtual Console",
+    "Switch Online",
+    "Evercade",
+    "Wii",
+    "3DS",
+    "NSO",
+    "Classic Mini",
+    "Mini",
+    "Genesis Mini",
+    "Mega Drive Mini",
 }
 
 # Preferred formats per system (first in list = preferred)
 PREFERRED_FORMATS = {
-    'Commodore 64': ['.d64', '.g64', '.crt', '.prg', '.t64', '.tap', '.nib'],
-    'Commodore VIC-20': ['.d64', '.crt', '.prg', '.t64', '.tap'],
-    'Commodore Amiga': ['.adf', '.ipf', '.lha', '.hdf'],
-    'Sinclair ZX Spectrum': ['.tzx', '.z80', '.tap', '.sna'],
-    'Amstrad CPC': ['.dsk', '.cdt', '.sna'],
-    'MSX': ['.rom', '.dsk', '.cas'],
-    'Atari ST': ['.st', '.stx', '.msa', '.ipf'],
-    'NEC PC-98': ['.hdi', '.fdi', '.d98', '.fdd'],
+    "Commodore 64": [".d64", ".g64", ".crt", ".prg", ".t64", ".tap", ".nib"],
+    "Commodore VIC-20": [".d64", ".crt", ".prg", ".t64", ".tap"],
+    "Commodore Amiga": [".adf", ".ipf", ".lha", ".hdf"],
+    "Sinclair ZX Spectrum": [".tzx", ".z80", ".tap", ".sna"],
+    "Amstrad CPC": [".dsk", ".cdt", ".sna"],
+    "MSX": [".rom", ".dsk", ".cas"],
+    "Atari ST": [".st", ".stx", ".msa", ".ipf"],
+    "NEC PC-98": [".hdi", ".fdi", ".d98", ".fdd"],
 }
 
 # Extensions to ignore (not ROMs)
 IGNORE_EXTENSIONS = {
-    '.txt', '.nfo', '.diz', '.jpg', '.jpeg', '.png', '.gif', '.bmp',
-    '.pdf', '.doc', '.md', '.html', '.htm', '.xml', '.json', '.dat',
-    '.cue', '.m3u', '.sfv', '.md5', '.sha1',
+    ".txt",
+    ".nfo",
+    ".diz",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".bmp",
+    ".pdf",
+    ".doc",
+    ".md",
+    ".html",
+    ".htm",
+    ".xml",
+    ".json",
+    ".dat",
+    ".cue",
+    ".m3u",
+    ".sfv",
+    ".md5",
+    ".sha1",
     # Game data files (not ROMs)
-    '.spr', '.mov', '.dad', '.avi', '.mpg', '.mp3', '.wav', '.ogg',
-    '.voc', '.mid', '.xmi', '.pak', '.grp', '.wad', '.cfg', '.ini',
-    '.sav', '.srm', '.exe', '.com', '.bat', '.dll', '.so', '.dylib',
+    ".spr",
+    ".mov",
+    ".dad",
+    ".avi",
+    ".mpg",
+    ".mp3",
+    ".wav",
+    ".ogg",
+    ".voc",
+    ".mid",
+    ".xmi",
+    ".pak",
+    ".grp",
+    ".wad",
+    ".cfg",
+    ".ini",
+    ".sav",
+    ".srm",
+    ".exe",
+    ".com",
+    ".bat",
+    ".dll",
+    ".so",
+    ".dylib",
 }
 
 # Platforms that contain full game installations (skip deduplication)
 SKIP_PLATFORMS = {
-    'MS-DOS', 'ScummVM', 'Windows', 'Apple Mac OS',
-    'Linux', 'DOS', 'PC',
+    "MS-DOS",
+    "ScummVM",
+    "Windows",
+    "Apple Mac OS",
+    "Linux",
+    "DOS",
+    "PC",
 }
 
 # =============================================================================
 # FILENAME PARSING
 # =============================================================================
 
+
 class RomInfo:
     """Parsed information about a ROM file."""
+
     def __init__(self, path: Path):
         self.path = path
         self.filename = path.name
@@ -181,25 +263,25 @@ class RomInfo:
         name = self.path.stem
 
         # Extract all parenthetical tags (Region), (Rev A), (Beta), etc.
-        paren_pattern = r'\(([^)]+)\)'
+        paren_pattern = r"\(([^)]+)\)"
         paren_matches = re.findall(paren_pattern, name)
 
         # Extract all bracket tags [!], [h1], etc.
-        bracket_pattern = r'\[([^\]]+)\]'
+        bracket_pattern = r"\[([^\]]+)\]"
         bracket_matches = re.findall(bracket_pattern, name)
 
         # Get base name by removing all tags
-        base = re.sub(paren_pattern, '', name)
-        base = re.sub(bracket_pattern, '', base)
-        base = re.sub(r'\s+', ' ', base).strip()
-        base = re.sub(r'[-_]+$', '', base).strip()
+        base = re.sub(paren_pattern, "", name)
+        base = re.sub(bracket_pattern, "", base)
+        base = re.sub(r"\s+", " ", base).strip()
+        base = re.sub(r"[-_]+$", "", base).strip()
         self.base_name = base
 
         # Process parenthetical tags
         for tag in paren_matches:
             tag_clean = tag.strip()
             tag_upper = tag_clean.upper()
-            tag_parts = [t.strip() for t in re.split(r'[,\s]+', tag_clean)]
+            tag_parts = [t.strip() for t in re.split(r"[,\s]+", tag_clean)]
 
             # Check for regions
             for part in tag_parts:
@@ -207,22 +289,22 @@ class RomInfo:
                     self.regions.append(part)
 
             # Check for revision
-            rev_match = re.match(r'Rev\s*([A-Z0-9]+)', tag_clean, re.IGNORECASE)
+            rev_match = re.match(r"Rev\s*([A-Z0-9]+)", tag_clean, re.IGNORECASE)
             if rev_match:
                 self.revision = rev_match.group(1)
 
             # Check for version
-            ver_match = re.match(r'v([\d.]+)', tag_clean, re.IGNORECASE)
+            ver_match = re.match(r"v([\d.]+)", tag_clean, re.IGNORECASE)
             if ver_match:
                 self.version = ver_match.group(1)
 
             # Check for disc/disk number (multi-disc games)
-            disc_match = re.match(r'Dis[ck]\s*(\d+)', tag_clean, re.IGNORECASE)
+            disc_match = re.match(r"Dis[ck]\s*(\d+)", tag_clean, re.IGNORECASE)
             if disc_match:
                 self.disc_number = disc_match.group(1)
 
             # Check for side number (multi-side games like FDS)
-            side_match = re.match(r'Side\s*([AB\d]+)', tag_clean, re.IGNORECASE)
+            side_match = re.match(r"Side\s*([AB\d]+)", tag_clean, re.IGNORECASE)
             if side_match:
                 self.side_number = side_match.group(1)
 
@@ -246,15 +328,15 @@ class RomInfo:
                 self.is_good_dump = True
             elif tag_clean.lower() in [t.lower() for t in REMOVE_BRACKET_TAGS]:
                 self.is_bad = True
-            elif re.match(r'^[hptbof]\d*$', tag_clean, re.IGNORECASE):
+            elif re.match(r"^[hptbof]\d*$", tag_clean, re.IGNORECASE):
                 self.is_bad = True
 
     def get_normalized_name(self) -> str:
         """Get normalized base name for grouping."""
         name = self.base_name.lower()
         # Remove common punctuation differences
-        name = re.sub(r"['\"-]", '', name)
-        name = re.sub(r'\s+', ' ', name)
+        name = re.sub(r"['\"-]", "", name)
+        name = re.sub(r"\s+", " ", name)
         name = name.strip()
         # Include disc/disk number to keep multi-disc games separate
         if self.disc_number:
@@ -277,14 +359,14 @@ class RomInfo:
             if self.revision.isdigit():
                 return int(self.revision)
             elif self.revision.isalpha():
-                return ord(self.revision.upper()) - ord('A') + 1
+                return ord(self.revision.upper()) - ord("A") + 1
         if self.version:
             # v1.1 > v1.0
             try:
-                parts = self.version.split('.')
+                parts = self.version.split(".")
                 score = 0
                 for i, p in enumerate(parts):
-                    score += int(p) * (100 ** (3-i))
+                    score += int(p) * (100 ** (3 - i))
                 return score
             except:
                 pass
@@ -313,6 +395,7 @@ class RomInfo:
 # DUPLICATE DETECTION
 # =============================================================================
 
+
 class DuplicateDetector:
     """Detects and categorizes duplicate ROMs."""
 
@@ -331,7 +414,7 @@ class DuplicateDetector:
         for platform_dir in sorted(self.roms_dir.iterdir()):
             if not platform_dir.is_dir():
                 continue
-            if platform_dir.name.startswith('.') or platform_dir.name.startswith('_'):
+            if platform_dir.name.startswith(".") or platform_dir.name.startswith("_"):
                 continue
             # Skip platforms with full game installations
             if platform_dir.name in SKIP_PLATFORMS:
@@ -339,15 +422,15 @@ class DuplicateDetector:
                 continue
 
             platform_files = 0
-            for rom_file in platform_dir.rglob('*'):
+            for rom_file in platform_dir.rglob("*"):
                 if not rom_file.is_file():
                     continue
                 if rom_file.suffix.lower() in IGNORE_EXTENSIONS:
                     continue
-                if rom_file.name.startswith('.'):
+                if rom_file.name.startswith("."):
                     continue
                 # Skip files in hidden directories or system folders
-                if any(part.startswith('.') for part in rom_file.parts):
+                if any(part.startswith(".") for part in rom_file.parts):
                     continue
 
                 try:
@@ -379,8 +462,8 @@ class DuplicateDetector:
     def _compute_md5(self, path: Path) -> str:
         """Compute MD5 hash of file."""
         hasher = hashlib.md5()
-        with open(path, 'rb') as f:
-            for chunk in iter(lambda: f.read(65536), b''):
+        with open(path, "rb") as f:
+            for chunk in iter(lambda: f.read(65536), b""):
                 hasher.update(chunk)
         return hasher.hexdigest()
 
@@ -399,13 +482,15 @@ class DuplicateDetector:
 
                 for rom in roms_sorted[1:]:
                     if rom.path not in processed_paths:
-                        self.duplicates.append({
-                            'platform': rom.platform,
-                            'remove': str(rom.path.relative_to(self.roms_dir)),
-                            'keep': str(keeper.path.relative_to(self.roms_dir)),
-                            'reason': 'Exact duplicate (hash match)',
-                            'size': rom.size,
-                        })
+                        self.duplicates.append(
+                            {
+                                "platform": rom.platform,
+                                "remove": str(rom.path.relative_to(self.roms_dir)),
+                                "keep": str(keeper.path.relative_to(self.roms_dir)),
+                                "reason": "Exact duplicate (hash match)",
+                                "size": rom.size,
+                            }
+                        )
                         processed_paths.add(rom.path)
 
         # Phase 2: Name-based duplicates within each platform
@@ -440,7 +525,9 @@ class DuplicateDetector:
                 keeper = None
                 for fmt in format_order:
                     if by_format[fmt]:
-                        candidates = sorted(by_format[fmt], key=lambda r: r.get_priority_score(), reverse=True)
+                        candidates = sorted(
+                            by_format[fmt], key=lambda r: r.get_priority_score(), reverse=True
+                        )
                         if keeper is None:
                             keeper = candidates[0]
                         break
@@ -458,13 +545,15 @@ class DuplicateDetector:
                     # Determine reason
                     reason = self._get_removal_reason(rom, keeper)
 
-                    self.duplicates.append({
-                        'platform': rom.platform,
-                        'remove': str(rom.path.relative_to(self.roms_dir)),
-                        'keep': str(keeper.path.relative_to(self.roms_dir)),
-                        'reason': reason,
-                        'size': rom.size,
-                    })
+                    self.duplicates.append(
+                        {
+                            "platform": rom.platform,
+                            "remove": str(rom.path.relative_to(self.roms_dir)),
+                            "keep": str(keeper.path.relative_to(self.roms_dir)),
+                            "reason": reason,
+                            "size": rom.size,
+                        }
+                    )
                     processed_paths.add(rom.path)
 
         # Phase 3: Always-remove bad ROMs (even if no duplicate exists)
@@ -472,13 +561,15 @@ class DuplicateDetector:
             if rom.path in processed_paths:
                 continue
             if rom.is_bad:
-                self.duplicates.append({
-                    'platform': rom.platform,
-                    'remove': str(rom.path.relative_to(self.roms_dir)),
-                    'keep': '(none - bad ROM)',
-                    'reason': f'Bad ROM: {", ".join(rom.tags) or ", ".join(rom.bracket_tags)}',
-                    'size': rom.size,
-                })
+                self.duplicates.append(
+                    {
+                        "platform": rom.platform,
+                        "remove": str(rom.path.relative_to(self.roms_dir)),
+                        "keep": "(none - bad ROM)",
+                        "reason": f"Bad ROM: {', '.join(rom.tags) or ', '.join(rom.bracket_tags)}",
+                        "size": rom.size,
+                    }
+                )
                 processed_paths.add(rom.path)
 
         logger.info(f"Found {len(self.duplicates)} duplicates")
@@ -508,11 +599,11 @@ class DuplicateDetector:
             reasons.append(f"Non-preferred format: {rom.extension}")
 
         if rom.get_region_priority() < keeper.get_region_priority():
-            rom_regions = ', '.join(rom.regions) if rom.regions else 'Unknown'
+            rom_regions = ", ".join(rom.regions) if rom.regions else "Unknown"
             reasons.append(f"Lower region priority: {rom_regions}")
 
         if rom.get_revision_score() < keeper.get_revision_score():
-            rev = rom.revision or rom.version or 'base'
+            rev = rom.revision or rom.version or "base"
             reasons.append(f"Older revision: {rev}")
 
         if not rom.is_good_dump and keeper.is_good_dump:
@@ -521,42 +612,48 @@ class DuplicateDetector:
         if not reasons:
             reasons.append("Duplicate (name match)")
 
-        return '; '.join(reasons)
+        return "; ".join(reasons)
 
     def generate_report(self, output_path: Path):
         """Generate CSV report of duplicates."""
         logger.info(f"Writing report to {output_path}...")
 
-        with open(output_path, 'w', newline='', encoding='utf-8') as f:
-            writer = csv.DictWriter(f, fieldnames=['platform', 'remove', 'keep', 'reason', 'size_mb'])
+        with open(output_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(
+                f, fieldnames=["platform", "remove", "keep", "reason", "size_mb"]
+            )
             writer.writeheader()
 
-            for dup in sorted(self.duplicates, key=lambda d: (d['platform'], d['remove'])):
-                writer.writerow({
-                    'platform': dup['platform'],
-                    'remove': dup['remove'],
-                    'keep': dup['keep'],
-                    'reason': dup['reason'],
-                    'size_mb': f"{dup['size'] / 1_000_000:.2f}",
-                })
+            for dup in sorted(self.duplicates, key=lambda d: (d["platform"], d["remove"])):
+                writer.writerow(
+                    {
+                        "platform": dup["platform"],
+                        "remove": dup["remove"],
+                        "keep": dup["keep"],
+                        "reason": dup["reason"],
+                        "size_mb": f"{dup['size'] / 1_000_000:.2f}",
+                    }
+                )
 
-        total_size = sum(d['size'] for d in self.duplicates)
-        logger.info(f"Report written: {len(self.duplicates)} duplicates, {total_size / 1_000_000_000:.2f} GB to remove")
+        total_size = sum(d["size"] for d in self.duplicates)
+        logger.info(
+            f"Report written: {len(self.duplicates)} duplicates, {total_size / 1_000_000_000:.2f} GB to remove"
+        )
 
     def save_cache(self, path: Path):
         """Save scan results to cache."""
         cache_data = {
-            'timestamp': datetime.now().isoformat(),
-            'roms': [
+            "timestamp": datetime.now().isoformat(),
+            "roms": [
                 {
-                    'path': str(r.path),
-                    'md5': r.md5,
-                    'size': r.size,
+                    "path": str(r.path),
+                    "md5": r.md5,
+                    "size": r.size,
                 }
                 for r in self.roms
-            ]
+            ],
         }
-        with open(path, 'w') as f:
+        with open(path, "w") as f:
             json.dump(cache_data, f)
         logger.info(f"Cache saved to {path}")
 
@@ -565,6 +662,7 @@ class DuplicateDetector:
 # PURGE OPERATIONS
 # =============================================================================
 
+
 class Purger:
     """Handles removal/quarantine of duplicate ROMs."""
 
@@ -572,12 +670,12 @@ class Purger:
         self.roms_dir = roms_dir
         self.quarantine_dir = quarantine_dir
 
-    def purge(self, duplicates: List[Dict], mode: str = 'dry-run'):
+    def purge(self, duplicates: List[Dict], mode: str = "dry-run"):
         """
         Remove duplicates.
         mode: 'dry-run', 'quarantine', or 'delete'
         """
-        if mode == 'dry-run':
+        if mode == "dry-run":
             logger.info("DRY RUN - no files will be modified")
 
         removed_count = 0
@@ -585,41 +683,43 @@ class Purger:
         errors = []
 
         for dup in duplicates:
-            rom_path = self.roms_dir / dup['remove']
+            rom_path = self.roms_dir / dup["remove"]
 
             if not rom_path.exists():
                 logger.warning(f"File not found: {rom_path}")
                 continue
 
-            if mode == 'dry-run':
+            if mode == "dry-run":
                 logger.info(f"Would remove: {dup['remove']} ({dup['size'] / 1_000_000:.2f} MB)")
                 logger.info(f"  Reason: {dup['reason']}")
                 logger.info(f"  Keeping: {dup['keep']}")
 
-            elif mode == 'quarantine':
+            elif mode == "quarantine":
                 try:
-                    dest = self.quarantine_dir / dup['remove']
+                    dest = self.quarantine_dir / dup["remove"]
                     dest.parent.mkdir(parents=True, exist_ok=True)
                     shutil.move(str(rom_path), str(dest))
                     logger.info(f"Quarantined: {dup['remove']}")
                     removed_count += 1
-                    removed_size += dup['size']
+                    removed_size += dup["size"]
                 except Exception as e:
                     errors.append(f"{rom_path}: {e}")
                     logger.error(f"Error quarantining {rom_path}: {e}")
 
-            elif mode == 'delete':
+            elif mode == "delete":
                 try:
                     rom_path.unlink()
                     logger.info(f"Deleted: {dup['remove']}")
                     removed_count += 1
-                    removed_size += dup['size']
+                    removed_size += dup["size"]
                 except Exception as e:
                     errors.append(f"{rom_path}: {e}")
                     logger.error(f"Error deleting {rom_path}: {e}")
 
-        if mode != 'dry-run':
-            logger.info(f"Removed {removed_count} files, freed {removed_size / 1_000_000_000:.2f} GB")
+        if mode != "dry-run":
+            logger.info(
+                f"Removed {removed_count} files, freed {removed_size / 1_000_000_000:.2f} GB"
+            )
             if errors:
                 logger.warning(f"{len(errors)} errors occurred")
 
@@ -630,17 +730,25 @@ class Purger:
 # MAIN
 # =============================================================================
 
+
 def main():
-    parser = argparse.ArgumentParser(description='ROM Deduplication Tool')
-    parser.add_argument('--scan', action='store_true', help='Scan ROMs directory')
-    parser.add_argument('--report', action='store_true', help='Generate duplicate report')
-    parser.add_argument('--purge', action='store_true', help='Remove duplicates')
-    parser.add_argument('--dry-run', action='store_true', help='Show what would be removed')
-    parser.add_argument('--quarantine', action='store_true', help='Move to quarantine instead of delete')
-    parser.add_argument('--delete', action='store_true', help='Permanently delete duplicates')
-    parser.add_argument('--no-hash', action='store_true', help='Skip hash computation (faster)')
-    parser.add_argument('--roms-dir', type=Path, default=Path.cwd(), help='ROMs directory (default: current directory)')
-    parser.add_argument('--platform', type=str, help='Only process specific platform')
+    parser = argparse.ArgumentParser(description="ROM Deduplication Tool")
+    parser.add_argument("--scan", action="store_true", help="Scan ROMs directory")
+    parser.add_argument("--report", action="store_true", help="Generate duplicate report")
+    parser.add_argument("--purge", action="store_true", help="Remove duplicates")
+    parser.add_argument("--dry-run", action="store_true", help="Show what would be removed")
+    parser.add_argument(
+        "--quarantine", action="store_true", help="Move to quarantine instead of delete"
+    )
+    parser.add_argument("--delete", action="store_true", help="Permanently delete duplicates")
+    parser.add_argument("--no-hash", action="store_true", help="Skip hash computation (faster)")
+    parser.add_argument(
+        "--roms-dir",
+        type=Path,
+        default=Path.cwd(),
+        help="ROMs directory (default: current directory)",
+    )
+    parser.add_argument("--platform", type=str, help="Only process specific platform")
 
     args = parser.parse_args()
 
@@ -667,7 +775,7 @@ def main():
         detector.generate_report(REPORT_FILE)
         print(f"\nReport saved to: {REPORT_FILE}")
         print(f"Total duplicates found: {len(detector.duplicates)}")
-        total_size = sum(d['size'] for d in detector.duplicates)
+        total_size = sum(d["size"] for d in detector.duplicates)
         print(f"Total space to recover: {total_size / 1_000_000_000:.2f} GB")
 
     if args.purge:
@@ -676,43 +784,45 @@ def main():
             if REPORT_FILE.exists():
                 logger.info(f"Loading duplicates from {REPORT_FILE}")
                 detector.duplicates = []
-                with open(REPORT_FILE, 'r', encoding='utf-8') as f:
+                with open(REPORT_FILE, "r", encoding="utf-8") as f:
                     reader = csv.DictReader(f)
                     for row in reader:
-                        detector.duplicates.append({
-                            'platform': row['platform'],
-                            'remove': row['remove'],
-                            'keep': row['keep'],
-                            'reason': row['reason'],
-                            'size': float(row['size_mb']) * 1_000_000,
-                        })
+                        detector.duplicates.append(
+                            {
+                                "platform": row["platform"],
+                                "remove": row["remove"],
+                                "keep": row["keep"],
+                                "reason": row["reason"],
+                                "size": float(row["size_mb"]) * 1_000_000,
+                            }
+                        )
             else:
                 logger.error("No duplicates found. Run --scan first.")
                 sys.exit(1)
 
         # Determine mode
         if args.delete:
-            mode = 'delete'
+            mode = "delete"
             print("\n*** WARNING: This will PERMANENTLY DELETE files! ***")
             confirm = input("Type 'DELETE' to confirm: ")
-            if confirm != 'DELETE':
+            if confirm != "DELETE":
                 print("Aborted.")
                 return
         elif args.quarantine:
-            mode = 'quarantine'
+            mode = "quarantine"
         else:
-            mode = 'dry-run'
+            mode = "dry-run"
 
         quarantine_dir = args.roms_dir / "_quarantine"
         purger = Purger(args.roms_dir, quarantine_dir)
         purger.purge(detector.duplicates, mode=mode)
 
         # After dry-run, show next steps
-        if mode == 'dry-run':
+        if mode == "dry-run":
             print(f"\nReport saved to: {REPORT_FILE}")
             print("\nTo permanently delete duplicates, run:")
-            print(f"  retro-romset-cleaner --purge --delete --roms-dir {args.roms_dir}")
+            print(f"  retrokit --purge --delete --roms-dir {args.roms_dir}")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

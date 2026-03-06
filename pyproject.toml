@@ -1,26 +1,56 @@
 [project]
-name = "retro-romset-cleaner"
-version = "0.1.0"
-description = "ROM deduplication tool for retro game collections"
+name = "retrokit"
+version = "1.0.0"
+description = "Retro gaming toolkit - ROM cleaning and asset generation"
 readme = "README.md"
 license = { text = "MIT" }
 authors = [{ name = "Tiago Silva" }]
-requires-python = ">=3.9"
-dependencies = []
+requires-python = ">=3.11"
+dependencies = [
+    "pillow>=10.0.0",
+    "httpx>=0.27.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "typer>=0.12.0",
+    "rich>=13.0.0",
+    "pyyaml>=6.0.0",
+    "imagequant>=1.1.5",
+]
+
+[project.optional-dependencies]
+dev = [
+    "ruff>=0.5.0",
+    "mypy>=1.10.0",
+    "pytest>=8.0.0",
+    "types-PyYAML>=6.0.0",
+]
 
 [project.scripts]
-retro-romset-cleaner = "main:main"
+retrokit = "retro_asset_gen.cli:app"
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-only-include = ["main.py"]
-sources = { "." = "" }
+packages = ["src/retro_asset_gen"]
 
 [tool.ruff]
 line-length = 100
+target-version = "py311"
 
 [tool.ruff.lint]
-select = ["E", "F", "I"]
+select = ["E", "F", "I", "N", "W", "UP", "B", "C4", "SIM"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/retrokit/prompts.py" = ["E501"]
+"main.py" = ["E501"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_ignores = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

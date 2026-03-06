@@ -48,7 +48,6 @@ logs/
 # >>> END MANAGED <<<
 
 # Project-specific rules
-*$py.class
 *.cover
 *.egg
 *.manifest
@@ -128,3 +127,13 @@ target/
 var/
 venv.bak/
 wheels/
+
+# ROM dedup tool outputs
+duplicate_report.csv
+_quarantine/
+
+# Asset generation outputs
+.output/
+
+# User reference images (can be large)
+.input/
