@@ -1,0 +1,35 @@
+# Theme Configuration for Retro Asset Generator
+#
+# This file defines the themes where assets can be deployed.
+# Each theme specifies the base path and how assets should be organized.
+#
+# Placeholders:
+#   {platform_id} - The platform identifier (e.g., "snes", "amigacd32")
+
+themes:
+  colorful:
+    # Base path to the COLORFUL theme directory
+    base_path: "/Volumes/RETRO/frontends/Pegasus_mac/themes/COLORFUL"
+
+    # Directory pattern for platform assets (relative to base_path)
+    assets_dir: "assets/images/{platform_id}"
+
+    # File names for each asset type
+    files:
+      device: "device.png"
+      logo_dark_color: "logo_dark_color.png"
+      logo_dark_black: "logo_dark_black.png"
+      logo_light_color: "logo_light_color.png"
+      logo_light_white: "logo_light_white.png"
+
+  # Example: Add more themes as needed
+  #
+  # my-custom-theme:
+  #   base_path: "~/themes/my-custom-theme"
+  #   assets_dir: "platforms/{platform_id}"
+  #   files:
+  #     device: "console.png"
+  #     logo_dark_color: "logo.png"
+  #     logo_dark_black: "logo_mono.png"
+  #     logo_light_color: "logo.png"
+  #     logo_light_white: "logo_mono.png"
