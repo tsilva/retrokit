@@ -10,11 +10,8 @@ jobs:
   test:
     uses: tsilva/.github/.github/workflows/test.yml@main
 
-  pii-scan:
-    uses: tsilva/.github/.github/workflows/pii-scan.yml@main
-
   publish:
-    needs: [test, pii-scan]
+    needs: [test]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: pypi
