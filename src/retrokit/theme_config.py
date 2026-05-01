@@ -150,8 +150,7 @@ def load_themes_config(path: Path | None = None) -> ThemesConfig:
 
     if path is None:
         raise ThemeConfigError(
-            "No themes.yaml found. Create one in the project root or "
-            "~/.config/retrokit/themes.yaml"
+            "No themes.yaml found. Create one in the project root or ~/.config/retrokit/themes.yaml"
         )
 
     if not path.exists():

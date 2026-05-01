@@ -26,7 +26,7 @@ from rich.table import Table
 
 from .config import get_settings
 from .generator import AssetGenerator
-from .roms import DuplicateDetector, RomPurger
+from .roms import DuplicateDetector, DuplicateRecord, RomPurger
 from .theme_config import (
     ThemeConfigError,
     create_default_themes_config,
@@ -542,10 +542,10 @@ def clean(
         console.print("[red]No report found. Run 'retrokit roms report' first.[/red]")
         raise typer.Exit(1)
 
-    duplicates = []
+    duplicates: list[DuplicateRecord] = []
     import csv
 
-    with open(report_path, "r", encoding="utf-8") as f:
+    with open(report_path, encoding="utf-8") as f:
         reader = csv.DictReader(f)
         for row in reader:
             duplicates.append(

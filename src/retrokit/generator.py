@@ -125,8 +125,13 @@ class AssetGenerator:
         logos_light_color_dir = base_dir / "logos" / "Light - Color"
         logos_light_white_dir = base_dir / "logos" / "Light - White"
 
-        for d in [devices_dir, logos_dark_black_dir, logos_dark_color_dir,
-                  logos_light_color_dir, logos_light_white_dir]:
+        for d in [
+            devices_dir,
+            logos_dark_black_dir,
+            logos_dark_color_dir,
+            logos_light_color_dir,
+            logos_light_white_dir,
+        ]:
             d.mkdir(parents=True, exist_ok=True)
 
         # Generate device image
@@ -167,12 +172,14 @@ class AssetGenerator:
                 for variant_name, variant_path in variants.items():
                     dimensions = get_image_dimensions(variant_path)
                     has_alpha = has_alpha_channel(variant_path)
-                    result.assets.append(GeneratedAsset(
-                        asset_type=variant_name,
-                        output_path=variant_path,
-                        dimensions=dimensions,
-                        has_alpha=has_alpha,
-                    ))
+                    result.assets.append(
+                        GeneratedAsset(
+                            asset_type=variant_name,
+                            output_path=variant_path,
+                            dimensions=dimensions,
+                            has_alpha=has_alpha,
+                        )
+                    )
                     self.console.print(
                         f"  [green]✓[/green] {variant_path.relative_to(self.settings.output_dir)} "
                         f"({dimensions[0]}x{dimensions[1]})"
@@ -296,9 +303,7 @@ class AssetGenerator:
                 device_type.target_height,
             )
             if (orig_w, orig_h) != (new_w, new_h):
-                self.console.print(
-                    f"  [dim]Resized: {orig_w}x{orig_h} -> {new_w}x{new_h}[/dim]"
-                )
+                self.console.print(f"  [dim]Resized: {orig_w}x{orig_h} -> {new_w}x{new_h}[/dim]")
 
             # Step 4: Apply difference matting
             self.console.print("  [dim]Extracting transparency via difference matting...[/dim]")
@@ -316,8 +321,7 @@ class AssetGenerator:
             dimensions = get_image_dimensions(output_path)
             has_alpha = has_alpha_channel(output_path)
             self.console.print(
-                f"  [green]✓[/green] {output_path.name} "
-                f"({dimensions[0]}x{dimensions[1]})"
+                f"  [green]✓[/green] {output_path.name} ({dimensions[0]}x{dimensions[1]})"
             )
 
             return GeneratedAsset(
@@ -386,9 +390,7 @@ class AssetGenerator:
                 logo_type.target_height,
             )
             if (orig_w, orig_h) != (new_w, new_h):
-                self.console.print(
-                    f"  [dim]Resized: {orig_w}x{orig_h} -> {new_w}x{new_h}[/dim]"
-                )
+                self.console.print(f"  [dim]Resized: {orig_w}x{orig_h} -> {new_w}x{new_h}[/dim]")
 
             # Apply chroma key transparency (white background -> transparent)
             if logo_type.bg_type:
@@ -397,8 +399,7 @@ class AssetGenerator:
             dimensions = get_image_dimensions(output_path)
             has_alpha = has_alpha_channel(output_path)
             self.console.print(
-                f"  [green]✓[/green] {output_path.name} "
-                f"({dimensions[0]}x{dimensions[1]})"
+                f"  [green]✓[/green] {output_path.name} ({dimensions[0]}x{dimensions[1]})"
             )
 
             return GeneratedAsset(
