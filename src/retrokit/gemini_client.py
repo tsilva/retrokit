@@ -66,12 +66,14 @@ class GeminiClient:
         if reference_image_path:
             with open(reference_image_path, "rb") as f:
                 ref_base64 = base64.b64encode(f.read()).decode("utf-8")
-            parts.append({
-                "inline_data": {
-                    "mime_type": "image/png",
-                    "data": ref_base64,
+            parts.append(
+                {
+                    "inline_data": {
+                        "mime_type": "image/png",
+                        "data": ref_base64,
+                    }
                 }
-            })
+            )
 
         parts.append({"text": prompt})
 

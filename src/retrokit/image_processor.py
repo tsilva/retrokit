@@ -106,7 +106,7 @@ class DifferenceMatteStats:
 def get_image_dimensions(image_path: Path) -> tuple[int, int]:
     """Get image width and height."""
     with Image.open(image_path) as img:
-        return cast(tuple[int, int], img.size)
+        return img.size
 
 
 def resize_image(
@@ -137,9 +137,7 @@ def resize_image(
 
 def _color_distance(c1: tuple[int, int, int], c2: tuple[int, int, int]) -> float:
     """Calculate Euclidean distance in RGB space."""
-    return math.sqrt(
-        (c1[0] - c2[0]) ** 2 + (c1[1] - c2[1]) ** 2 + (c1[2] - c2[2]) ** 2
-    )
+    return math.sqrt((c1[0] - c2[0]) ** 2 + (c1[1] - c2[1]) ** 2 + (c1[2] - c2[2]) ** 2)
 
 
 def _clamp(val: float, min_val: int = 0, max_val: int = 255) -> int:
@@ -210,9 +208,7 @@ def make_background_transparent(
 
             else:
                 # Edge pixel - graduated alpha with color decontamination
-                alpha_float = (dist - pure_bg_threshold) / (
-                    pure_fg_threshold - pure_bg_threshold
-                )
+                alpha_float = (dist - pure_bg_threshold) / (pure_fg_threshold - pure_bg_threshold)
                 alpha = _clamp(alpha_float * 255)
 
                 # Color decontamination: remove background color contribution
@@ -399,10 +395,13 @@ def auto_remove_background(
 
                 for dx, dy in neighbors:
                     nx, ny = x + dx, y + dy
-                    if 0 <= nx < width and 0 <= ny < height:
-                        if cast(tuple[int, int, int, int], pixels[nx, ny])[3] == 0:
-                            erode_list.append((x, y))
-                            break
+                    if (
+                        0 <= nx < width
+                        and 0 <= ny < height
+                        and cast(tuple[int, int, int, int], pixels[nx, ny])[3] == 0
+                    ):
+                        erode_list.append((x, y))
+                        break
 
         if not erode_list:
             break
@@ -537,9 +536,7 @@ def difference_matte(
     img_black = Image.open(black_bg_path).convert("RGBA")
 
     if img_white.size != img_black.size:
-        raise ValueError(
-            f"Dimension mismatch: white={img_white.size}, black={img_black.size}"
-        )
+        raise ValueError(f"Dimension mismatch: white={img_white.size}, black={img_black.size}")
 
     width, height = img_white.size
     pixels_white = img_white.load()
@@ -569,9 +566,7 @@ def difference_matte(
             r_b, g_b, b_b, _ = pixel_b
 
             # Calculate distance between the two observed pixels
-            pixel_dist = math.sqrt(
-                (r_w - r_b) ** 2 + (g_w - g_b) ** 2 + (b_w - b_b) ** 2
-            )
+            pixel_dist = math.sqrt((r_w - r_b) ** 2 + (g_w - g_b) ** 2 + (b_w - b_b) ** 2)
 
             # Calculate alpha:
             # If pixel is 100% opaque: looks same on both backgrounds (dist = 0)

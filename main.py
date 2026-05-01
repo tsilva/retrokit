@@ -21,14 +21,12 @@ import csv
 import hashlib
 import json
 import logging
-import os
 import re
 import shutil
 import sys
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
 
 # Get script directory for relative paths
 SCRIPT_DIR = Path(__file__).parent.resolve()
@@ -245,16 +243,16 @@ class RomInfo:
 
         # Parsed metadata
         self.base_name = ""
-        self.regions: List[str] = []
-        self.revision: Optional[str] = None
-        self.version: Optional[str] = None
-        self.disc_number: Optional[str] = None  # For multi-disc games
-        self.side_number: Optional[str] = None  # For multi-side games
-        self.tags: Set[str] = set()
-        self.bracket_tags: Set[str] = set()
+        self.regions: list[str] = []
+        self.revision: str | None = None
+        self.version: str | None = None
+        self.disc_number: str | None = None  # For multi-disc games
+        self.side_number: str | None = None  # For multi-side games
+        self.tags: set[str] = set()
+        self.bracket_tags: set[str] = set()
         self.is_bad = False
         self.is_good_dump = False
-        self.source_variant: Optional[str] = None
+        self.source_variant: str | None = None
 
         self._parse_filename()
 
@@ -280,7 +278,6 @@ class RomInfo:
         # Process parenthetical tags
         for tag in paren_matches:
             tag_clean = tag.strip()
-            tag_upper = tag_clean.upper()
             tag_parts = [t.strip() for t in re.split(r"[,\s]+", tag_clean)]
 
             # Check for regions
@@ -326,9 +323,9 @@ class RomInfo:
 
             if tag_clean == GOOD_DUMP_TAG:
                 self.is_good_dump = True
-            elif tag_clean.lower() in [t.lower() for t in REMOVE_BRACKET_TAGS]:
-                self.is_bad = True
-            elif re.match(r"^[hptbof]\d*$", tag_clean, re.IGNORECASE):
+            elif tag_clean.lower() in [t.lower() for t in REMOVE_BRACKET_TAGS] or re.match(
+                r"^[hptbof]\d*$", tag_clean, re.IGNORECASE
+            ):
                 self.is_bad = True
 
     def get_normalized_name(self) -> str:
@@ -368,11 +365,11 @@ class RomInfo:
                 for i, p in enumerate(parts):
                     score += int(p) * (100 ** (3 - i))
                 return score
-            except:
+            except ValueError:
                 pass
         return 0
 
-    def get_priority_score(self) -> Tuple[int, int, int, int, int]:
+    def get_priority_score(self) -> tuple[int, int, int, int, int]:
         """
         Get overall priority score for comparison.
         Higher tuple = better ROM to keep.
@@ -401,10 +398,10 @@ class DuplicateDetector:
 
     def __init__(self, roms_dir: Path):
         self.roms_dir = roms_dir
-        self.roms: List[RomInfo] = []
-        self.by_hash: Dict[str, List[RomInfo]] = defaultdict(list)
-        self.by_name: Dict[str, Dict[str, List[RomInfo]]] = defaultdict(lambda: defaultdict(list))
-        self.duplicates: List[Dict] = []
+        self.roms: list[RomInfo] = []
+        self.by_hash: dict[str, list[RomInfo]] = defaultdict(list)
+        self.by_name: dict[str, dict[str, list[RomInfo]]] = defaultdict(lambda: defaultdict(list))
+        self.duplicates: list[dict] = []
 
     def scan(self, compute_hashes: bool = True):
         """Scan ROM directory and parse all files."""
@@ -474,7 +471,7 @@ class DuplicateDetector:
         processed_paths = set()
 
         # Phase 1: Exact hash duplicates
-        for md5, roms in self.by_hash.items():
+        for _md5, roms in self.by_hash.items():
             if len(roms) > 1:
                 # All are exact duplicates, pick best one
                 roms_sorted = sorted(roms, key=lambda r: r.get_priority_score(), reverse=True)
@@ -495,7 +492,7 @@ class DuplicateDetector:
 
         # Phase 2: Name-based duplicates within each platform
         for platform, name_groups in self.by_name.items():
-            for norm_name, roms in name_groups.items():
+            for _norm_name, roms in name_groups.items():
                 if len(roms) <= 1:
                     continue
 
@@ -575,7 +572,7 @@ class DuplicateDetector:
         logger.info(f"Found {len(self.duplicates)} duplicates")
         return self.duplicates
 
-    def _get_preferred_formats(self, platform: str) -> List[str]:
+    def _get_preferred_formats(self, platform: str) -> list[str]:
         """Get preferred format order for a platform."""
         for plat_name, formats in PREFERRED_FORMATS.items():
             if plat_name.lower() in platform.lower():
@@ -670,7 +667,7 @@ class Purger:
         self.roms_dir = roms_dir
         self.quarantine_dir = quarantine_dir
 
-    def purge(self, duplicates: List[Dict], mode: str = "dry-run"):
+    def purge(self, duplicates: list[dict], mode: str = "dry-run"):
         """
         Remove duplicates.
         mode: 'dry-run', 'quarantine', or 'delete'
@@ -784,7 +781,7 @@ def main():
             if REPORT_FILE.exists():
                 logger.info(f"Loading duplicates from {REPORT_FILE}")
                 detector.duplicates = []
-                with open(REPORT_FILE, "r", encoding="utf-8") as f:
+                with open(REPORT_FILE, encoding="utf-8") as f:
                     reader = csv.DictReader(f)
                     for row in reader:
                         detector.duplicates.append(

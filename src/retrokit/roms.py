@@ -10,7 +10,18 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Set, Tuple
+from typing import TypedDict
+
+
+class DuplicateRecord(TypedDict):
+    """CSV/report row describing a duplicate ROM removal candidate."""
+
+    platform: str
+    remove: str
+    keep: str
+    reason: str
+    size: float
+
 
 # Region priority (higher = better)
 REGION_PRIORITY = {
@@ -63,7 +74,6 @@ REMOVE_TAGS = {
     "Unlicensed",
     "Pirate",
     "Hack",
-    "Hack",
     "Homebrew",
     "Aftermarket",
     "Alt",
@@ -85,10 +95,10 @@ REMOVE_TAGS = {
 REMOVE_BRACKET_TAGS = {"[h", "[b", "[p", "[t", "[o", "[f", "[B", "[c", "[a"}
 
 # Preferred formats per platform
-PREFERRED_FORMATS: Dict[str, str] = {}
+PREFERRED_FORMATS: dict[str, str] = {}
 
 # Platforms to skip
-SKIP_PLATFORMS: Set[str] = set()
+SKIP_PLATFORMS: set[str] = set()
 
 
 @dataclass
@@ -98,25 +108,25 @@ class RomInfo:
     path: Path
     platform: str
     name: str
-    regions: List[str] = field(default_factory=list)
-    tags: List[str] = field(default_factory=list)
-    revision: Optional[str] = None
-    version: Optional[str] = None
+    regions: list[str] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
+    revision: str | None = None
+    version: str | None = None
     is_beta: bool = False
     is_proto: bool = False
     is_demo: bool = False
     is_hack: bool = False
     is_aftermarket: bool = False
     is_good_dump: bool = False
-    md5: Optional[str] = None
+    md5: str | None = None
     size: int = 0
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         self._parse_filename()
         if self.path.exists():
             self.size = self.path.stat().st_size
 
-    def _parse_filename(self):
+    def _parse_filename(self) -> None:
         """Extract metadata from filename."""
         filename = self.path.name
 
@@ -179,7 +189,7 @@ class RomInfo:
                 return 0
         return 0
 
-    def should_remove(self) -> Tuple[bool, str]:
+    def should_remove(self) -> tuple[bool, str]:
         """Check if this ROM should be removed."""
         reasons = []
 
@@ -204,11 +214,11 @@ class DuplicateDetector:
 
     def __init__(self, roms_dir: Path):
         self.roms_dir = roms_dir
-        self.roms: List[RomInfo] = []
-        self.duplicates: List[Dict] = []
+        self.roms: list[RomInfo] = []
+        self.duplicates: list[DuplicateRecord] = []
         self.logger = logging.getLogger(__name__)
 
-    def scan(self, compute_hashes: bool = True, platform_filter: Optional[str] = None):
+    def scan(self, compute_hashes: bool = True, platform_filter: str | None = None) -> None:
         """Scan ROMs directory."""
         self.logger.info(f"Scanning {self.roms_dir}...")
         self.roms = []
@@ -251,13 +261,13 @@ class DuplicateDetector:
                 hash_md5.update(chunk)
         return hash_md5.hexdigest()
 
-    def find_duplicates(self):
+    def find_duplicates(self) -> None:
         """Find duplicate ROMs."""
         self.logger.info("Finding duplicates...")
         self.duplicates = []
 
         # Group by hash
-        hash_groups: Dict[str, List[RomInfo]] = defaultdict(list)
+        hash_groups: dict[str, list[RomInfo]] = defaultdict(list)
         for rom in self.roms:
             if rom.md5:
                 hash_groups[rom.md5].append(rom)
@@ -279,13 +289,13 @@ class DuplicateDetector:
                         )
 
         # Group by name within platform
-        name_groups: Dict[Tuple[str, str], List[RomInfo]] = defaultdict(list)
+        name_groups: dict[tuple[str, str], list[RomInfo]] = defaultdict(list)
         for rom in self.roms:
             key = (rom.platform, rom.name.lower())
             name_groups[key].append(rom)
 
         # Find name-based duplicates
-        for (platform, name), roms in name_groups.items():
+        for (_platform, _name), roms in name_groups.items():
             if len(roms) > 1:
                 keeper = self._select_keeper(roms)
                 for rom in roms:
@@ -306,10 +316,10 @@ class DuplicateDetector:
 
         self.logger.info(f"Found {len(self.duplicates)} duplicates")
 
-    def _select_keeper(self, roms: List[RomInfo]) -> RomInfo:
+    def _select_keeper(self, roms: list[RomInfo]) -> RomInfo:
         """Select best ROM to keep from duplicates."""
 
-        def score(rom: RomInfo) -> Tuple:
+        def score(rom: RomInfo) -> tuple[int, int, int, int, int, int, int, int, int]:
             return (
                 0 if rom.is_aftermarket else 1,
                 0 if rom.is_beta else 1,
@@ -348,7 +358,7 @@ class DuplicateDetector:
 
         return "; ".join(reasons)
 
-    def generate_report(self, output_path: Path) -> Tuple[int, float]:
+    def generate_report(self, output_path: Path) -> tuple[int, float]:
         """Generate CSV report of duplicates."""
         self.logger.info(f"Writing report to {output_path}...")
 
@@ -372,7 +382,7 @@ class DuplicateDetector:
         total_size = sum(d["size"] for d in self.duplicates)
         return len(self.duplicates), total_size
 
-    def save_cache(self, path: Path):
+    def save_cache(self, path: Path) -> None:
         """Save scan results to cache."""
         cache_data = {
             "timestamp": datetime.now().isoformat(),
@@ -397,7 +407,9 @@ class RomPurger:
         self.quarantine_dir = quarantine_dir
         self.logger = logging.getLogger(__name__)
 
-    def purge(self, duplicates: List[Dict], mode: str = "dry-run") -> Tuple[int, float, List[str]]:
+    def purge(
+        self, duplicates: list[DuplicateRecord], mode: str = "dry-run"
+    ) -> tuple[int, float, list[str]]:
         """
         Remove duplicates.
         mode: 'dry-run', 'quarantine', or 'delete'
@@ -406,7 +418,7 @@ class RomPurger:
             self.logger.info("DRY RUN - no files will be modified")
 
         removed_count = 0
-        removed_size = 0
+        removed_size = 0.0
         errors = []
 
         for dup in duplicates:
