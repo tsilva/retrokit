@@ -1,6 +1,6 @@
 [project]
 name = "retrokit"
-version = "1.0.0"
+version = "1.0.1"
 description = "Retro gaming toolkit - ROM cleaning and asset generation"
 readme = "README.md"
 license = { text = "MIT" }
