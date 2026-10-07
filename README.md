@@ -1,10 +1,10 @@
-<div align="center">
+<p align="center">
   <img src="https://raw.githubusercontent.com/tsilva/retrokit/main/logo.png" alt="retrokit" width="512"/>
-
-  # retrokit
-
-  **🎮 Retro gaming toolkit — AI-powered platform asset generation and smart ROM collection cleaning 🧰**
-</div>
+  <br />
+  <!-- repo-tagline:start -->
+  <strong>🎮 Generate retro gaming assets and clean ROM collections 🧰</strong>
+  <!-- repo-tagline:end -->
+</p>
 
 retrokit is a Python CLI for preparing retro gaming libraries. It generates Pegasus Frontend platform artwork from reference images with Gemini, and it scans ROM folders for duplicate or low-quality variants before you remove them.
 
