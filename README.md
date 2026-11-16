@@ -1,3 +1,10 @@
+<!-- archive-repo:deprecation-notice:start -->
+> [!WARNING]
+> **Deprecated**
+>
+> This project is no longer needed. Agents can now use image models to generate the required assets directly.
+<!-- archive-repo:deprecation-notice:end -->
+
 <p align="center">
   <img src="https://raw.githubusercontent.com/tsilva/retrokit/main/logo.png" alt="retrokit" width="512"/>
   <br />
